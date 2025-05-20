@@ -1,93 +1,116 @@
-import fetch from 'node-fetch'
+let nbRecipes = 0
+let recipes = {}
+let url = 'https://api-ugi2pflmha-ew.a.run.app'
 
-const recipes = []
-
-export default async function citiesRoutes(fastify, options) {
-  // GET /cities/:cityId/infos
-  fastify.get('/cities/:cityId/infos', async (request, reply) => {
-    const { cityId } = request.params
-
+export async function getCityInfo(req, rep) {
     try {
-      // Fetch city data from City API
-      const cityResponse = await fetch(`https://api-ugi2pflmha-ew.a.run.app/cities/${cityId}`)
-      if (!cityResponse.ok) {
-        return reply.status(404).send({ error: 'City not found' })
-      }
-      const cityData = await cityResponse.json()
+        let cityId = req.params["cityId"]
 
-      // Fetch weather data from Weather API
-      const weatherResponse = await fetch(`https://api-ugi2pflmha-ew.a.run.app/weather/${cityId}`)
-      const weatherData = await weatherResponse.json()
+        const responseInsight = await fetch(`${url}/cities/${cityId}/insights?apiKey=${process.env.API_KEY}`);
 
-      // Prepare response
-      const response = {
-        coordinates: [cityData.latitude, cityData.longitude],
-        population: cityData.population,
-        knownFor: cityData.knownFor,
-        weatherPredictions: weatherData.predictions,
-        recipes: recipes.filter(recipe => recipe.cityId === cityId),
-      }
+        if (!responseInsight.ok) {
+            throw new Error(`La ville n'existe pas`);
+        }
+        
+        const insights = await responseInsight.json();
 
-      reply.send(response)
+        console.log(insights)
+
+        const responseMeteo = await fetch(`${url}/weather-predictions?apiKey=${process.env.API_KEY}&cityId=${cityId}`);
+
+        if (!responseMeteo.ok) {
+            throw new Error(`Pas de météo ?`);
+        }
+        
+        const meteo = await responseMeteo.json();
+
+
+        rep.send({
+            coordinates:[insights.coordinates[0].latitude, insights.coordinates[0].longitude],
+            population:insights.population,
+            knownFor:insights.knownFor,
+            weatherPredictions:meteo[0].predictions,
+            recipes:recipes[cityId] ? recipes[cityId] : []
+        })
+
     } catch (error) {
-      reply.status(500).send({ error: 'Internal server error' })
-    }
-  })
-
-  // POST /cities/:cityId/recipes
-  fastify.post('/cities/:cityId/recipes', async (request, reply) => {
-    const { cityId } = request.params
-    const { content } = request.body
-
-    // Validate content
-    if (!content || content.length < 10 || content.length > 2000) {
-      return reply.status(400).send({ error: 'Invalid recipe content' })
+        console.error(error);
+        rep.status(500).send({ error: error.message });
     }
 
+}
+
+
+export async function postCityRecipe(req, rep) {
+    let cityId = req.params["cityId"]
+    
     try {
-      // Check if city exists
-      const cityResponse = await fetch(`https://api-ugi2pflmha-ew.a.run.app/cities/${cityId}`)
-      if (!cityResponse.ok) {
-        return reply.status(404).send({ error: 'City not found' })
-      }
+        if (!req.body) {
+            throw new Error("Body manquant");
+        }
 
-      // Create recipe
-      const recipe = {
-        id: recipes.length + 1,
-        cityId,
-        content,
-      }
-      recipes.push(recipe)
+        let { content } = req.body
 
-      reply.status(201).send(recipe)
+        if (!content) {
+            throw new Error("Pas de contenu");
+        }
+
+        const responseCity = await fetch(`${url}/cities?apiKey=${process.env.API_KEY}&search=${cityId}`);
+
+        if (responseCity.status == 404) {
+            rep.status(404).send({error:"La ville n'existe pas"});
+            return
+        } 
+
+        if (!Object.keys(recipes).includes(cityId)) {
+            recipes[cityId] = []
+        }
+
+        if (content.length < 10 || content.length > 2000) {
+            rep.status(400).send({ error:"Longueur du contenu mauvaise"});
+            return
+        }
+
+        recipes[cityId].push({id: ++nbRecipes, content:content})
+        rep.status(201).send({id: nbRecipes, content:content})
+
     } catch (error) {
-      reply.status(500).send({ error: 'Internal server error' })
+        console.error(error);
+        rep.status(400).send({ error: error.message });
     }
-  })
+    
+}
 
-  // DELETE /cities/:cityId/recipes/:recipeId
-  fastify.delete('/cities/:cityId/recipes/:recipeId', async (request, reply) => {
-    const { cityId, recipeId } = request.params
 
+export async function deleteCityRecipe(req, rep) {
     try {
-      // Check if city exists
-      const cityResponse = await fetch(`https://api-ugi2pflmha-ew.a.run.app/cities/${cityId}`)
-      if (!cityResponse.ok) {
-        return reply.status(404).send({ error: 'City not found' })
-      }
+        let cityId = req.params["cityId"]
+        let recipeId = req.params["recipeId"]
 
-      // Find and delete recipe
-      const recipeIndex = recipes.findIndex(
-        recipe => recipe.cityId === cityId && recipe.id === parseInt(recipeId)
-      )
-      if (recipeIndex === -1) {
-        return reply.status(404).send({ error: 'Recipe not found' })
-      }
+        const responseCity = await fetch(`${url}/cities?apiKey=${process.env.API_KEY}&search=${cityId}`);
 
-      recipes.splice(recipeIndex, 1)
-      reply.status(204).send()
+        if (responseCity.status == 404) {
+            rep.status(404).send({error:"La ville n'existe pas"});
+            return
+        }
+
+        if (Object.keys(recipes).includes(cityId)) {
+            let len = recipes[cityId].length
+            recipes[cityId] = recipes[cityId].filter((v) => {return v.id != recipeId})
+
+            if (len == recipes[cityId].length) {
+                rep.status(404).send({error:"La recette n'existe pas"});
+                return
+            }
+        } else {
+            rep.status(404).send({error:"La recette n'existe pas"});
+            return
+        }
+
+        rep.status(204).send({})
     } catch (error) {
-      reply.status(500).send({ error: 'Internal server error' })
+        console.error(error);
+        rep.status(500).send({ error: error.message });
     }
-  })
+
 }
