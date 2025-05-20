@@ -9,8 +9,9 @@ export async function getCityInfo(req, rep) {
         const responseInsight = await fetch(`${url}/cities/${cityId}/insights?apiKey=${process.env.API_KEY}`);
 
         if (!responseInsight.ok) {
-            throw new Error(`La ville n'existe pas`);
-        }
+          rep.status(404).send({error:"La ville n'existe pas"});
+          return
+      }
         
         const insights = await responseInsight.json();
 
@@ -29,11 +30,13 @@ export async function getCityInfo(req, rep) {
             coordinates:[insights.coordinates[0].latitude, insights.coordinates[0].longitude],
             population:insights.population,
             knownFor:insights.knownFor,
-            weatherPredictions:{
-              maxTemperature:meteo[0].predictions.maxTemperature,
-              minTemperature:meteo[0].predictions.maxTemperature,
-              when:meteo[0].predictions.date,
-          },
+            weather:meteo[0].predictions.map((v) => {
+              return {
+                  max:v.maxTemperature,
+                  min:v.maxTemperature,
+                  when:v.date,
+              }
+          }),
             recipes:recipes[cityId] ? recipes[cityId] : []
         })
 
