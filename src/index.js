@@ -1,10 +1,14 @@
 import 'dotenv/config'
 import Fastify from 'fastify'
 import { submitForReview } from './submission.js'
+import citiesRoutes from './cities.js' // Import des routes
 
 const fastify = Fastify({
   logger: true,
 })
+
+// Enregistrement des routes
+fastify.register(citiesRoutes)
 
 fastify.listen(
   {
