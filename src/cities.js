@@ -29,7 +29,11 @@ export async function getCityInfo(req, rep) {
             coordinates:[insights.coordinates[0].latitude, insights.coordinates[0].longitude],
             population:insights.population,
             knownFor:insights.knownFor,
-            weatherPredictions:meteo[0].predictions,
+            weatherPredictions:{
+              maxTemperature:meteo[0].predictions.maxTemperature,
+              minTemperature:meteo[0].predictions.maxTemperature,
+              when:meteo[0].predictions.date,
+          },
             recipes:recipes[cityId] ? recipes[cityId] : []
         })
 
