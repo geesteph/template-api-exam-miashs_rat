@@ -30,7 +30,7 @@ export async function getCityInfo(req, rep) {
             coordinates:[insights.coordinates[0].latitude, insights.coordinates[0].longitude],
             population:insights.population,
             knownFor:insights.knownFor,
-            weather:meteo[0].predictions.map((v) => {
+            weatherPredictions:meteo[0].predictions.map((v) => {
               return {
                   max:v.maxTemperature,
                   min:v.maxTemperature,
